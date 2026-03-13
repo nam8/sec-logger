@@ -1,18 +1,23 @@
 name: Supabase Keep Alive
-
 on:
   schedule:
-    # Run every 3 days at 03:00 UTC
     - cron: "0 3 */3 * *"
   workflow_dispatch:
 
 jobs:
   keepalive:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Ping Supabase REST API
+      - name: Query Supabase to prevent pausing
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-          "https://fusruugffrzpdzexaxzf.supabase.co/rest/v1/" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+          response=$(curl -s -w "\n%{http_code}" \
+            "https://fusruugffrzpdzexaxzf.supabase.co/rest/v1/keep_alive?select=pinged_at" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -1)
+          echo "HTTP $http_code: $body"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Keep-alive ping failed with HTTP $http_code"
+            exit 1
+          fi
